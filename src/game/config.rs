@@ -2,20 +2,26 @@ use std::fmt;
 
 use clap::Parser;
 
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Copy)]
 #[command(version, about, long_about=None)]
 pub struct Config {
     /// Tile count in x axis
     #[arg(short, long, default_value_t = 15)]
-    pub x: u32,
+    pub x: usize,
 
     /// Tile count in y axis
     #[arg(short, long, default_value_t = 15)]
-    pub y: u32,
+    pub y: usize,
 
     /// Number of mines placed in the grid
     #[arg(short, long, default_value_t = 20)]
-    pub mines: u32,
+    pub mines: usize,
+}
+
+impl Config {
+    pub fn tile_count(&self) -> usize {
+        self.x * self.y
+    }
 }
 
 pub type Result<T> = std::result::Result<T, ConfigError>;
@@ -39,7 +45,7 @@ impl fmt::Debug for ConfigError {
             self.config.mines,
             self.config.x,
             self.config.y,
-            self.config.x * self.config.y
+            self.config.tile_count()
         )
     }
 }

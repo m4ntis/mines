@@ -6,9 +6,10 @@ use game::Game;
 fn main() -> game::Result<()> {
     let config = game::Config::parse();
 
-    let game = Game::new(config)?;
+    let mut game = Game::new(config)?;
 
-    game.run();
+    game.generate();
+    game.print();
 
     Ok(())
 }
