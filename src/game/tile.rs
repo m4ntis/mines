@@ -55,3 +55,25 @@ impl Tile {
         None
     }
 }
+
+impl ToString for Tile {
+    fn to_string(&self) -> String {
+        match self.state {
+            State::Opened => match self.value {
+                Value::Mine => "*".to_string(),
+                Value::Empty(n) => {
+                    if n == 0 {
+                        " ".to_string()
+                    } else {
+                        n.to_string()
+                    }
+                }
+            },
+            State::Closed(mark) => match mark {
+                Marking::None => "⎕".to_string(),
+                Marking::Flag => "⌻".to_string(),
+                Marking::Question => "⍰".to_string(),
+            },
+        }
+    }
+}

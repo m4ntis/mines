@@ -9,6 +9,7 @@ fn main() -> game::Result<()> {
     let mut game = Game::new(config)?;
 
     game.generate();
+    game.open(5, 5);
     game.print();
 
     Ok(())
