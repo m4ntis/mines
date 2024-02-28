@@ -1,17 +1,17 @@
 #[derive(Clone, Copy)]
-pub enum Value {
+pub enum TileValue {
     Mine,
     Empty(u32),
 }
 
 #[derive(Clone, Copy)]
-pub enum State {
-    Closed(Marking),
+pub enum TileState {
+    Closed(TileMarking),
     Opened,
 }
 
 #[derive(Clone, Copy)]
-pub enum Marking {
+pub enum TileMarking {
     None,
     Flag,
     Question,
@@ -19,61 +19,49 @@ pub enum Marking {
 
 #[derive(Clone, Copy)]
 pub struct Tile {
-    pub value: Value,
+    pub value: TileValue,
 
-    pub state: State,
+    pub state: TileState,
 }
 
 impl Tile {
     pub fn new() -> Self {
         Self {
-            value: Value::Empty(0),
-            state: State::Closed(Marking::None),
+            value: TileValue::Empty(0),
+            state: TileState::Closed(TileMarking::None),
         }
     }
 
     pub fn set_mine(&mut self) {
-        self.value = Value::Mine
+        self.value = TileValue::Mine
     }
 
     pub fn inc_mine_count(&mut self) {
-        if let Value::Empty(n) = self.value {
-            self.value = Value::Empty(n + 1)
+        if let TileValue::Empty(n) = self.value {
+            self.value = TileValue::Empty(n + 1)
         }
     }
 
     /// Opens a tile if yet unopen
     ///
-    /// Will return a tile's `Value` if the tile was closed when `open` was
+    /// Will return a tile's `TileValue` if the tile was closed when `open` was
     /// called.
-    pub fn open(&mut self) -> Option<Value> {
-        if let State::Closed(_) = self.state {
-            self.state = State::Opened;
+    pub fn open(&mut self) -> Option<TileValue> {
+        if let TileState::Closed(_) = self.state {
+            self.state = TileState::Opened;
             return Some(self.value);
         }
 
         None
     }
-}
 
-impl ToString for Tile {
-    fn to_string(&self) -> String {
-        match self.state {
-            State::Opened => match self.value {
-                Value::Mine => "*".to_string(),
-                Value::Empty(n) => {
-                    if n == 0 {
-                        " ".to_string()
-                    } else {
-                        n.to_string()
-                    }
-                }
-            },
-            State::Closed(mark) => match mark {
-                Marking::None => "⎕".to_string(),
-                Marking::Flag => "⌻".to_string(),
-                Marking::Question => "⍰".to_string(),
-            },
+    pub fn cycle(&mut self) {
+        if let TileState::Closed(mark) = self.state {
+            self.state = TileState::Closed(match mark {
+                TileMarking::None => TileMarking::Flag,
+                TileMarking::Flag => TileMarking::Question,
+                TileMarking::Question => TileMarking::None,
+            });
         }
     }
 }

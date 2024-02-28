@@ -2,122 +2,139 @@ mod config;
 mod tile;
 
 use config::ConfigError;
-pub use config::{Config, Result};
-use rand::Rng;
 use tile::Tile;
 
-pub struct Game {
-    config: Config,
+pub use config::{Config, Result};
+pub use tile::{TileMarking, TileState, TileValue};
 
+use rand::Rng;
+
+pub struct Game {
     board: Vec<Vec<Tile>>,
 }
 
 impl Game {
+    /// Creates a new instance of a `Game`, generating a board according to the
+    /// supplied config.
     pub fn new(config: Config) -> Result<Self> {
         if config.mines > config.x * config.y || config.x * config.y == 0 {
             return Err(ConfigError::new(config));
         }
 
         Ok(Self {
-            config: config,
-            board: vec![vec![Tile::new(); config.y]; config.x],
+            board: generate_board(config),
         })
     }
 
-    pub fn generate(&mut self) {
-        for _i in 0..self.config.mines {
-            loop {
-                let (x, y) = self.gen_rand_coords();
-                if let tile::Value::Mine = self.board[x][y].value {
-                    continue;
-                }
-
-                self.board[x][y].set_mine();
-                Self::for_adjacent(x, y, self.width(), self.height(), |x, y| {
-                    self.board[x][y].inc_mine_count()
-                });
-                break;
-            }
-        }
-    }
-
-    pub fn open(&mut self, x: usize, y: usize) {
-        if x >= self.width() || y >= self.height() {
-            return;
+    /// Opens a tile on the game's board at a given coordinate.
+    ///
+    /// Returns whether the opened tile was a mine, determining the end of the
+    /// game.
+    pub fn open(&mut self, x: usize, y: usize) -> bool {
+        if !self.coordinate_in_bounds(x, y) {
+            return false;
         }
 
         if let Some(v) = self.board[x][y].open() {
             match v {
-                tile::Value::Mine => println!("Game over :("),
-                tile::Value::Empty(n) => {
-                    // Open empty spaces with no mines adjacent recursively
+                TileValue::Mine => return true,
+                TileValue::Empty(n) => {
                     if n == 0 {
-                        Self::for_adjacent(x, y, self.width(), self.height(), |x, y| {
-                            self.open(x, y)
+                        // Recursively open empty spaces with no adjacent mines
+                        for_adjacent(x, y, self.width(), self.height(), |x, y| {
+                            self.open(x, y);
                         });
                     }
                 }
             }
         }
+
+        return false;
     }
 
-    pub fn print(&self) {
-        for y in 0..self.height() {
-            let mut row_string = String::new();
-
-            for x in 0..self.width() {
-                row_string.push_str(&self.board[x][y].to_string())
-            }
-
-            println!("{}", row_string);
+    /// Cycles a tile's marking between the different markings.
+    ///
+    /// Cycling an opened tile will do nothing.
+    pub fn cycle(&mut self, x: usize, y: usize) {
+        if !self.coordinate_in_bounds(x, y) {
+            return;
         }
+
+        self.board[x][y].cycle()
     }
 
-    fn width(&self) -> usize {
+    pub fn get_tile(&self, x: usize, y: usize) -> Option<(TileState, TileValue)> {
+        if !self.coordinate_in_bounds(x, y) {
+            return None;
+        }
+
+        Some((self.board[x][y].state, self.board[x][y].value))
+    }
+
+    pub fn width(&self) -> usize {
         self.board.len()
     }
 
-    fn height(&self) -> usize {
+    pub fn height(&self) -> usize {
         self.board[0].len()
     }
 
-    fn gen_rand_coords(&self) -> (usize, usize) {
-        let num = rand::thread_rng().gen_range(0..self.config.tile_count());
-        (num % self.width(), num / self.width())
+    fn coordinate_in_bounds(&self, x: usize, y: usize) -> bool {
+        return x < self.width() && y < self.height();
+    }
+}
+
+fn generate_board(config: Config) -> Vec<Vec<Tile>> {
+    let mut board = vec![vec![Tile::new(); config.y]; config.x];
+
+    for _i in 0..config.mines {
+        loop {
+            let (x, y) = gen_rand_coords(config);
+            if let TileValue::Mine = board[x][y].value {
+                continue;
+            }
+
+            board[x][y].set_mine();
+            for_adjacent(x, y, config.x, config.y, |x, y| {
+                board[x][y].inc_mine_count()
+            });
+            break;
+        }
     }
 
-    fn for_adjacent(
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-        mut func: impl FnMut(usize, usize),
-    ) {
-        Self::for_adjacent_in_row(x, y, width, height, &mut func);
+    board
+}
 
-        if x > 0 {
-            Self::for_adjacent_in_row(x - 1, y, width, height, &mut func);
-        }
-        if x < width - 1 {
-            Self::for_adjacent_in_row(x + 1, y, width, height, &mut func);
-        }
+fn gen_rand_coords(config: Config) -> (usize, usize) {
+    let num = rand::thread_rng().gen_range(0..config.tile_count());
+    (num % config.x, num / config.x)
+}
+
+fn for_adjacent(
+    x: usize,
+    y: usize,
+    width: usize,
+    height: usize,
+    mut func: impl FnMut(usize, usize),
+) {
+    for_adjacent_in_row(x, y, height, &mut func);
+
+    if x > 0 {
+        for_adjacent_in_row(x - 1, y, height, &mut func);
+    }
+    if x < width - 1 {
+        for_adjacent_in_row(x + 1, y, height, &mut func);
+    }
+}
+
+fn for_adjacent_in_row(x: usize, y: usize, height: usize, func: &mut impl FnMut(usize, usize)) {
+    func(x, y);
+
+    if y > 0 {
+        func(x, y - 1);
     }
 
-    fn for_adjacent_in_row(
-        x: usize,
-        y: usize,
-        width: usize,
-        height: usize,
-        func: &mut impl FnMut(usize, usize),
-    ) {
-        func(x, y);
-
-        if y > 0 {
-            func(x, y - 1);
-        }
-
-        if y < height - 1 {
-            func(x, y + 1);
-        }
+    if y < height - 1 {
+        func(x, y + 1);
     }
 }
